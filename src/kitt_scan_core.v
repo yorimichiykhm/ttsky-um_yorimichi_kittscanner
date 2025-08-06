@@ -46,7 +46,7 @@ end
 reg [20:0] prescaler;
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-        prescaler <= 18'b0;
+        prescaler <= 21'b0;
     end else begin
         if (!psc_enable) begin
             prescaler <= 21'b0; // Reset prescaler if not enabled
@@ -54,13 +54,13 @@ always @(posedge clk or negedge rst_n) begin
             if (prescaler < NUM_NORM) begin // 10MHz / 66.67Hz = 1500000 cycles for 150ms
                 prescaler <= prescaler + 1'b1;
             end else begin
-                prescaler <= 18'd0; // Reset prescaler
+                prescaler <= 21'd0; // Reset prescaler
             end
         end else begin // Fast mode (100ms)
             if (prescaler < NUM_FAST) begin // 10MHz / 100Hz = 1000000 cycles for 100ms
                 prescaler <= prescaler + 1'b1;
             end else begin
-                prescaler <= 18'd0; // Reset prescaler
+                prescaler <= 21'd0; // Reset prescaler
             end
         end
     end

@@ -34,6 +34,6 @@ kitt_scan_core i_kitt_scan_core(
     .PWMOUT (uio_out)
 );
 assign uio_oe = 8'hff;
-wire _unused = &{ui_in[7:5],uio_in, 1'b0};
+wire _unused = &{ena, ui_in[7:5],uio_in, 1'b0};
 
 endmodule
