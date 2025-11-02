@@ -1,9 +1,34 @@
+// File:    debouncer.v
+// Author:  Yorimichi
+// Date:    2025-11-03
+// Version: 1.0
+// Brief:   debouncer module
+// 
+// Copyright (c) 2025- Yorimichi
+// License: Apache-2.0
+// 
+// Revision History:
+//   1.0 - Initial release
+//
 module debuncer (
     input wire clk, // 10MHz clock
     input wire rst_n,
     input wire ena_in,
     output reg ena_out
 );
+    // 2-FFs synchoronizer for reset
+    reg reset_sync_ff, psc_on;
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            reset_sync_ff <= 1'b0;
+            psc_on <= 1'b0;
+        end
+        else begin
+            reset_sync_ff <= 1'b1;
+            psc_on <= reset_sync_ff;
+        end 
+    end
+    //
     // 2-FFs synchronizer 
     //
     reg [1:0] sync_ff;
@@ -19,7 +44,7 @@ module debuncer (
         if (!rst_n) begin
             prescaler <= 18'b0;
         end else begin
-            if (prescaler < 18'd249999) begin // 10MHz / 400Hz = 250000 cycles for 25ms
+            if (psc_on & (prescaler < 18'd249999)) begin // 10MHz / 400Hz = 250000 cycles for 25ms
                 prescaler <= prescaler + 1'b1;
             end else begin
                 prescaler <= 18'd0; // Reset prescaler

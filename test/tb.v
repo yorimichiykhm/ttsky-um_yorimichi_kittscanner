@@ -7,12 +7,13 @@
 module tb ();
 
   // Dump the signals to a VCD file. You can view it with gtkwave or surfer.
+/*
   initial begin
     $dumpfile("tb.vcd");
     $dumpvars(0, tb);
     #1;
   end
-
+*/
   // Wire up the inputs and outputs:
   reg clk;
   reg rst_n;
@@ -28,7 +29,7 @@ module tb ();
 `endif
 
   // Replace tt_um_example with your module name:
-  tt_um_example user_project (
+  tt_um_yorimichi_kittscanner user_project (
 
       // Include power ports for the Gate Level test:
 `ifdef GL_TEST

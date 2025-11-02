@@ -1,3 +1,15 @@
+// File:    kitt_scan_core.v
+// Author:  Yorimichi
+// Date:    2025-11-03
+// Version: 1.0
+// Brief:   Core module for KITT Scanner
+// 
+// Copyright (c) 2025- Yorimichi
+// License: Apache-2.0
+// 
+// Revision History:
+//   1.0 - Initial release
+//
 module kitt_scan_core(
     input  wire          clk, // 10MHz clock
     input  wire          rst_n,
@@ -5,28 +17,32 @@ module kitt_scan_core(
     input  wire          SPEED, // Speed control signal (0: slow, 1: fast)
     input  wire [1:0]    MODE, // Mode control signal
     input  wire          OINV, // Output inversion signal
-    output wire [7:0]    LVOUT, // Lamp output for KITT scanner
+    input  wire          OSEL, // Output selection signal
+    output wire [7:0]    LEDOUT, // Lamp output for KITT scanner
     output wire [7:0]    PWMOUT // PWM output for KITT scanner
 );
 // parameters
-parameter NUM_NORM = 21'd1499999; // 150ms in clock cycles (10MHz)
-parameter NUM_FAST = 21'd999999; // 100ms in clock cycles  (10MHz) 
+parameter NUM_NORM = 21'd1500000; // 150ms in clock cycles (10MHz)
+parameter NUM_FAST = 21'd1000000; // 100ms in clock cycles  (10MHz) 
 //
 // mode signal capture
 reg       cap_enable; // Capture enable signal
 reg [1:0] mode_ff; // Mode signal captured from the input
 reg       speed_ff; // Speed signal captured from the input
 reg       oinv_ff; // Output inversion signal captured from the input
+reg       osel_ff; // Output selection signal captured from the input
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         mode_ff <= 2'b00; // Reset mode signal
         speed_ff <= 1'b0; // Reset speed signal
         oinv_ff <= 1'b0; // Reset output inversion signal
+        osel_ff <= 1'b0; // Reset output selection signal
     end else begin
         if (cap_enable) begin
             mode_ff <= MODE; // Capture mode signal when enabled
             speed_ff <= SPEED; // Capture speed signal when enabled
             oinv_ff <= OINV; // Capture output inversion signal when enabled
+            osel_ff <= OSEL; // Capture output selection signal when enabled
         end
     end
 end 
@@ -51,13 +67,13 @@ always @(posedge clk or negedge rst_n) begin
         if (!psc_enable) begin
             prescaler <= 21'b0; // Reset prescaler if not enabled
         end else if (speed_ff == 1'b0) begin // Slow mode (150ms)
-            if (prescaler < NUM_NORM) begin // 10MHz / 66.67Hz = 1500000 cycles for 150ms
+            if (prescaler < NUM_NORM-1) begin // 10MHz / 66.67Hz = 1500000 cycles for 150ms
                 prescaler <= prescaler + 1'b1;
             end else begin
                 prescaler <= 21'd0; // Reset prescaler
             end
         end else begin // Fast mode (100ms)
-            if (prescaler < NUM_FAST) begin // 10MHz / 100Hz = 1000000 cycles for 100ms
+            if (prescaler < NUM_FAST-1) begin // 10MHz / 100Hz = 1000000 cycles for 100ms
                 prescaler <= prescaler + 1'b1;
             end else begin
                 prescaler <= 21'd0; // Reset prescaler
@@ -68,46 +84,48 @@ end
 //
 wire psc_ovf; // PWM overflow signal
 assign psc_ovf = psc_enable ? 
-                 (prescaler ==(speed_ff ? NUM_FAST : NUM_NORM)) : 1'b1; 
+                 (prescaler == (speed_ff ? (NUM_FAST - 1'b1) : (NUM_NORM - 1'b1) ) ) : 1'b1; 
 //
 // PWM generation
-parameter NUM_PWM = (1000 - 1); // 100us in clock cycles (10MHz)
-parameter PWM_DUTY0 = ((NUM_PWM + 1) / 4) - 1;
-parameter PWM_DUTY1 = ((NUM_PWM + 1) / 10) - 1;
-parameter PWM_DUTY2 = ((NUM_PWM + 1) / 20) - 1;
+parameter NUM_PWM = 1000; // 100us in clock cycles (10MHz)
+parameter PWM_DUTY0 = (NUM_PWM / 4) - 1;
+parameter PWM_DUTY1 = (NUM_PWM / 10) - 1;
+parameter PWM_DUTY2 = (NUM_PWM / 20) - 1;
 //
 reg [9:0] pwm_count;
+reg       tgl_cnt;
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         pwm_count <= 10'b0; // Reset PWM counter
+        tgl_cnt <= 1'b0;
     end else begin
         if(!pwm_enable) begin
             pwm_count <= 10'b0; // Reset PWM counter if PWM is disabled
-        end else if (pwm_count < NUM_PWM) begin
+        end else if (pwm_count < NUM_PWM -1) begin
             pwm_count <= pwm_count + 1'b1; // Increment PWM counter
         end else begin
             pwm_count <= 10'b0; // Reset PWM counter
+            tgl_cnt <= ~tgl_cnt;
         end
     end
 end
 //
 // PWM signals
 reg pwm25, pwm10, pwm05;
+wire nx_pwm25, nx_pwm10, nx_pwm05;
+assign nx_pwm25 = pwm_enable ?  ((pwm_count < PWM_DUTY0) ? 1'b1 : 1'b0) : 1'b0; // 25% duty cycle
+assign nx_pwm10 = pwm_enable ?  ((pwm_count < PWM_DUTY1) ? 1'b1 : 1'b0) : 1'b0; // 10% duty cycle
+assign nx_pwm05 = pwm_enable ?  ((pwm_count < PWM_DUTY2) ? 1'b1 : 1'b0) : 1'b0; // 5% duty cycle
+//
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         pwm25 <= 1'b0; // Reset PWM25 signal
         pwm10 <= 1'b0; // Reset PWM10 signal
         pwm05 <= 1'b0; // Reset PWM05 signal
     end else begin
-        if(!pwm_enable) begin
-            pwm25 <= 1'b0; // Reset PWM25 if PWM is disabled
-            pwm10 <= 1'b0; // Reset PWM10 if PWM is disabled
-            pwm05 <= 1'b0; // Reset PWM05 if PWM is disabled
-        end else begin
-            pwm25 <= (pwm_count < PWM_DUTY0) ? 1'b1 : 1'b0; // Set PWM25 based on duty cycle
-            pwm10 <= (pwm_count < PWM_DUTY1) ? 1'b1 : 1'b0; // Set PWM10 based on duty cycle
-            pwm05 <= (pwm_count < PWM_DUTY2) ? 1'b1 : 1'b0; // Set PWM05 based on duty cycle
-        end
+        pwm25 <= nx_pwm25;
+        pwm10 <= nx_pwm10;
+        pwm05 <= nx_pwm05;
     end
 end
 //
@@ -136,9 +154,9 @@ always @(posedge clk or negedge rst_n) begin
         pre_lvout <= next_lvout; // Store current LVOUT for next cycle
         for(integer i=0; i<8; i=i+1) begin
             pre_pwmout[i] <= (next_pwmsel[i] == 3'd0) ? 1'b1 : // 100% duty
-                             (next_pwmsel[i] == 3'd1) ? pwm25 : // 25% duty
-                             (next_pwmsel[i] == 3'd2) ? pwm10 : // 10% duty
-                             (next_pwmsel[i] == 3'd3) ? pwm05 : // 5% duty
+                             (next_pwmsel[i] == 3'd1) ? nx_pwm25 : // 25% duty
+                             (next_pwmsel[i] == 3'd2) ? nx_pwm10 : // 10% duty
+                             (next_pwmsel[i] == 3'd3) ? nx_pwm05 : // 5% duty
                              1'b0; // 0% duty
         end
         for(integer i=0; i<8; i=i+1) begin
@@ -146,8 +164,8 @@ always @(posedge clk or negedge rst_n) begin
         end
     end
 end
-assign LVOUT = oinv_ff ? ~pre_lvout : pre_lvout; // Invert LVOUT if OINV is high
-assign PWMOUT = oinv_ff ? ~pre_pwmout : pre_pwmout; // Invert PWMOUT if OINV is high
+assign LEDOUT = {8{oinv_ff}} ^ (osel_ff ? pre_pwmout : pre_lvout); // Select output based on OSEL and invert if OINV is high
+//assign PWMOUT = oinv_ff ? ~pre_pwmout : pre_pwmout; // Invert PWMOUT if OINV is high
 //
 // state machine states
 parameter IDLE = 6'd0;
@@ -604,5 +622,14 @@ always@* begin
         end
     end
 end
-
+//
+assign PWMOUT[0] = oinv_ff ^ pwm05;
+assign PWMOUT[1] = oinv_ff ^ pwm10;
+assign PWMOUT[2] = oinv_ff ^ pwm25;
+assign PWMOUT[3] = psc_ovf;
+assign PWMOUT[4] = tgl_cnt;
+assign PWMOUT[5] = ENA;
+assign PWMOUT[6] = speed_ff;
+assign PWMOUT[7] = |mode_ff;
+//
 endmodule
