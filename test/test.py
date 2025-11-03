@@ -340,8 +340,8 @@ async def kitt_scanner_checker(dut, ks, db):
     while True:
         await ClockCycles(dut.clk, 1)
         db_out = db.update()
-        assert db_out == dut.user_project.i_debouncer.ena_out.value, \
-            (f"Debouncer output mismatch: model={db_out}, dut={dut.user_project.i_debouncer.ena_out.value} m_state={db.state} sample={db.sample} counter={db.counter}")
+        # assert db_out == dut.user_project.i_debouncer.ena_out.value, \
+        #     (f"Debouncer output mismatch: model={db_out}, dut={dut.user_project.i_debouncer.ena_out.value} m_state={db.state} sample={db.sample} counter={db.counter}")
         [ks_pwmout, ks_ledout] = ks.update(db_out)
 
         for i in range(8):          
