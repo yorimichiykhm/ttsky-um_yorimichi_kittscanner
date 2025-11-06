@@ -49,7 +49,6 @@ This project is K.I.T.T. scanner lights controller.
 | 3 | Mode 3 | 
 
 ## OINV
-出力レベル反転設定
 
 | OINV | Description |
 |------|-------------|
